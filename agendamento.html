@@ -305,7 +305,7 @@
         .alert.error {
             background: #fee2e2;
             color: #991b1b;
-            border: 1px solid #fca5a5;
+            border: 1px solid #fecaca;
         }
 
         .alert.info {
@@ -313,6 +313,29 @@
             color: #1e40af;
             border: 1px solid #93c5fd;
         }
+
+        .password-hint {
+                display: block;
+                margin-top: 5px;
+                font-size: 0.85rem;
+                color: #6b7280;
+                font-style: italic;
+            }
+
+            .settings-section {
+                background: #f9fafb;
+                padding: 25px;
+                border-radius: 12px;
+                border: 1px solid #e5e7eb;
+            }
+
+            .settings-section h3 {
+                margin: 0 0 20px 0;
+                font-size: 1.2rem;
+                font-weight: 600;
+            }
+
+
 
         .alert.warning {
             background: #fef3c7;
@@ -557,6 +580,12 @@
                                 <textarea id="scheduleNotes" rows="3" placeholder="Informações adicionais sobre a reunião"></textarea>
                             </div>
 
+                            <div class="form-group">
+                                <label for="schedulePassword">🔒 Senha para Cancelamento</label>
+                                <input type="password" id="schedulePassword" required placeholder="Defina uma senha para cancelar este agendamento" minlength="4">
+                                <small class="password-hint">💡 Esta senha será necessária para cancelar este agendamento específico</small>
+                            </div>
+
                             <button type="submit" class="btn" id="scheduleBtn">
                                 📅 Agendar Reunião
                             </button>
@@ -614,11 +643,18 @@
                                 <textarea id="cancelReason" rows="3" required placeholder="Por favor, informe o motivo do cancelamento"></textarea>
                             </div>
 
+                            <div class="form-group">
+                                <label for="cancelPassword">🔒 Senha de Exclusão *</label>
+                                <input type="password" id="cancelPassword" required placeholder="Digite a senha para confirmar a exclusão">
+                            </div>
+
                             <button type="submit" class="btn cancel" id="cancelBtn">
                                 ❌ Cancelar Reunião
                             </button>
                         </form>
                     </div>
+
+
                 </div>
             </div>
         </div>
@@ -670,6 +706,8 @@
             document.getElementById('scheduleDate').min = minDate;
             document.getElementById('cancelDate').min = minDate;
         }
+
+
 
         function setupEventListeners() {
             // Navegação do calendário
@@ -873,6 +911,7 @@
                 participants: document.getElementById('scheduleParticipants').value,
                 department: document.getElementById('scheduleDepartment').value,
                 notes: document.getElementById('scheduleNotes').value,
+                cancel_password: document.getElementById('schedulePassword').value,
                 created_at: new Date().toISOString()
             };
             
@@ -932,6 +971,32 @@
             }
         }
 
+        // Função para validar senha de exclusão específica do agendamento
+        async function validateDeletePassword(password, appointmentData) {
+            try {
+                // Buscar o agendamento específico para verificar a senha
+                const { data: appointment, error } = await supabase
+                    .from('appointments')
+                    .select('cancel_password')
+                    .eq('email', appointmentData.email)
+                    .eq('date', appointmentData.date)
+                    .eq('start_time', appointmentData.time)
+                    .eq('subject', appointmentData.subject)
+                    .single();
+                
+                if (error) {
+                    console.error('Erro ao buscar agendamento:', error);
+                    return false;
+                }
+                
+                // Verificar se a senha do agendamento coincide
+                return appointment.cancel_password === password;
+            } catch (error) {
+                console.error('Erro na validação de senha:', error);
+                return false;
+            }
+        }
+
         async function handleCancelSubmit(e) {
             e.preventDefault();
             
@@ -945,6 +1010,15 @@
             const time = document.getElementById('cancelTime').value;
             const subject = document.getElementById('cancelSubject').value;
             const reason = document.getElementById('cancelReason').value;
+            const password = document.getElementById('cancelPassword').value;
+            
+            // Validar senha antes de prosseguir
+            const appointmentData = { email, date, time, subject };
+            const isPasswordValid = await validateDeletePassword(password, appointmentData);
+            if (!isPasswordValid) {
+                showAlert('❌ Senha incorreta! Acesso negado para exclusão.', 'error');
+                return;
+            }
             
             // Mostrar loading
             const submitBtn = document.getElementById('cancelBtn');
@@ -1361,6 +1435,8 @@
         document.addEventListener('DOMContentLoaded', function() {
             loadSavedLogo();
         });
+
+
     </script>
 </body>
 </html>
